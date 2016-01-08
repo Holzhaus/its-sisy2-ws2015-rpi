@@ -7,8 +7,10 @@ from . import protocol
 
 if sys.version_info.major == 3:
     from xmlrpc.client import ServerProxy
+    from xmlrpc.client import Binary
 else:
     from xmlrpclib import ServerProxy
+    from xmlrpclib import Binary
 
 
 class Client(object):
@@ -48,6 +50,8 @@ class AuthClient(Client):
             try:
                 rotation = self._sensor.get_rotation()
                 if(self.authenticate(rotation)):
+                    message = 'This is a secret message from the client.'
+                    self.exchange_secret_messages(rotation, message)
                     stopped = True
                 else:
                     time.sleep(1)
@@ -89,3 +93,30 @@ class AuthClient(Client):
                 self._logger.error('Authentication failed: %s',
                                    'client hash mismatch')
         return False
+
+    def exchange_secret_messages(self, client_rotation, client_plaintext):
+        self._logger.info('client_message (plain): %r', client_plaintext)
+
+        client_ciphertext, client_iv = protocol.encrypt(
+            client_rotation, client_plaintext)
+
+        self._logger.debug('client_message (encrypted): %r', client_ciphertext)
+        self._logger.debug('client_iv: %r', client_iv)
+
+        server_answer = self._server.communicate(
+            Binary(client_iv), Binary(client_ciphertext))
+
+        if tuple(server_answer) == ('', 'not authenticated'):
+            self._logger.critical('Server says were not authenticated!')
+            return
+
+        server_ciphertext = server_answer[0].data
+        server_iv = server_answer[1].data
+
+        self._logger.debug('server_iv: %r', server_iv)
+        self._logger.debug('server_message (encrypted): %r', server_ciphertext)
+
+        server_plaintext = protocol.decrypt(
+            client_rotation, server_ciphertext, server_iv)
+
+        self._logger.info('server_message (plain): %r', server_plaintext)

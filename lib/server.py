@@ -7,9 +7,11 @@ from . import protocol
 if sys.version_info.major == 3:
     from xmlrpc.server import SimpleXMLRPCServer
     from xmlrpc.server import SimpleXMLRPCRequestHandler
+    from xmlrpc.client import Binary
 else:
     from SimpleXMLRPCServer import SimpleXMLRPCServer
     from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
+    from xmlrpclib import Binary
 
 
 # Restrict to a particular path.
@@ -60,10 +62,12 @@ class AuthServer(Server):
     def __init__(self, *args, **kwargs):
         Server.__init__(self, *args, **kwargs)
         self._authdata = {}
+        self._authenticated = None
         self._nonces = protocol.nonce_generator()
 
         self.register_function(self.exchange_hashes, 'exchange_hashes')
         self.register_function(self.compare_values, 'compare_values')
+        self.register_function(self.communicate, 'communicate')
 
     def exchange_hashes(self, client_hash):
         nonce = next(self._nonces)
@@ -91,7 +95,40 @@ class AuthServer(Server):
         if client_hash != client_hash2:
             return (1, 'server hash mismatch')
         else:
+            self._authenticated = server_rotation
             return (0, server_salt)
+
+    def communicate(self, client_iv, client_ciphertext):
+        client_iv = client_iv.data
+        client_ciphertext = client_ciphertext.data
+
+        self._logger.debug('client_message (encrypted): %r', client_ciphertext)
+        self._logger.debug('client_iv: %r', client_iv)
+
+        if self._authenticated is None:
+            self._logger.warning('Unauthorized connection attempt!')
+            return ('', 'not authenticated')
+        server_rotation = self._authenticated
+        self._authenticated = None
+
+        self._logger.info("Authenticated client has sent a message")
+
+        client_plaintext = protocol.decrypt(
+            server_rotation, client_ciphertext, client_iv)
+
+        self._logger.info("client_message (plain): %s", client_plaintext)
+
+        server_plaintext = 'This is the server\'s answer!'
+
+        self._logger.info("server_message (plain): %s", server_plaintext)
+
+        server_ciphertext, server_iv = protocol.encrypt(
+            server_rotation, server_plaintext)
+
+        self._logger.debug('server_iv: %r', server_iv)
+        self._logger.debug('server_message (encrypted): %r', server_ciphertext)
+
+        return (Binary(server_ciphertext), Binary(server_iv))
 
     def run(self):
         self._logger.info('Started listening on %s:%d ...',
