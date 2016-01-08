@@ -28,7 +28,8 @@ class Server(SimpleXMLRPCServer):
         SimpleXMLRPCServer.__init__(
             self,
             (self._server_address, self._server_port),
-            requestHandler=RequestHandler)
+            requestHandler=RequestHandler,
+            logRequests=False)
 
         self.register_introspection_functions()
 
@@ -71,12 +72,18 @@ class AuthServer(Server):
 
     def exchange_hashes(self, client_hash):
         nonce = next(self._nonces)
+        self._logger.debug('Exchanging hashes... (nonce %r)', nonce)
 
         # Get current rotation and hash it
         server_rotation = self._sensor.get_rotation()
         server_salt = protocol.get_salt()
         server_hash = protocol.hash_rotation(server_rotation, server_salt,
                                              nonce=nonce)
+
+        self._logger.debug('server_rotation: %r', server_rotation)
+        self._logger.debug('server_salt: %r', server_salt)
+        self._logger.debug('server_hash: %r', server_hash)
+
         # Save server salt and hashed client rotation
         self._authdata[nonce] = (server_rotation, server_salt, client_hash)
 
@@ -84,17 +91,27 @@ class AuthServer(Server):
         return (nonce, server_hash)
 
     def compare_values(self, nonce, client_salt):
+        self._logger.debug('Comparing values... (nonce %r)', nonce)
         try:
             data = self._authdata[nonce]
             del self._authdata[nonce]
         except KeyError:
+            self._logger.warning('Got invalid nonce: %r', nonce)
             return (1, 'nonce invalid')
         (server_rotation, server_salt, client_hash) = data
 
+        self._logger.debug('server_rotation: %r', server_rotation)
+        self._logger.debug('server_salt: %r', server_salt)
+        self._logger.debug('client_hash: %r', client_hash)
+
         client_hash2 = protocol.hash_rotation(server_rotation, client_salt)
+        self._logger.debug('client_hash2: %r', client_hash2)
+
         if client_hash != client_hash2:
+            self._logger.warning('Server hash mismatch')
             return (1, 'server hash mismatch')
         else:
+            self._logger.warning('Client authenticated! (%r)', server_rotation)
             self._authenticated = server_rotation
             return (0, server_salt)
 

@@ -65,6 +65,7 @@ class AuthClient(Client):
         self._logger.info("Client exited.")
 
     def authenticate(self, client_rotation):
+        self._logger.debug('Trying to authenticate...')
         client_salt = protocol.get_salt()
         client_hash = protocol.hash_rotation(client_rotation, client_salt)
 
@@ -87,7 +88,8 @@ class AuthClient(Client):
             self._logger.debug('server_salt: %r', server_salt)
             self._logger.debug('server_hash2: %r', server_hash2)
             if server_hash2 == server_hash:
-                self._logger.info('Authentication succeeded!')
+                self._logger.info('Authentication succeeded! (%r)',
+                                  client_rotation)
                 return True
             else:
                 self._logger.error('Authentication failed: %s',
@@ -95,6 +97,7 @@ class AuthClient(Client):
         return False
 
     def exchange_secret_messages(self, client_rotation, client_plaintext):
+        self._logger.debug('Exchanging secret messages...')
         self._logger.info('client_message (plain): %r', client_plaintext)
 
         client_ciphertext, client_iv = protocol.encrypt(
