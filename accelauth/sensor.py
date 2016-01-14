@@ -16,12 +16,36 @@ class Axis(object):
     Z = 0x08
 
 
+DEMO_VALUES = {
+    Axis.X: 123,
+    Axis.Y: 45,
+    Axis.Z: 67
+}
+
+
 class DemoSensor(object):
     def __init__(self, *args, **kwargs):
-        pass
+        self.offset = kwargs['offset'] if 'offset' in kwargs else (0, 0, 0)
+        self.quantize = kwargs['offset'] if 'quantize' in kwargs else True
+
+    def get_axis_raw(self, axis):
+        return DEMO_VALUES[axis]
+
+    def get_axis(self, axis):
+        value = self.get_axis_raw(axis)
+        value += self.offset[axis-Axis.X]
+        if self.quantize:
+            value = quantize(value, 255, 40)
+        return value
 
     def get_rotation(self):
-        return (123, 45, 67)
+        '''
+        Returns the rotation as a tuple in the form (x, y, z).
+        '''
+        x = self.get_axis(Axis.X)
+        y = self.get_axis(Axis.Y)
+        z = self.get_axis(Axis.Z)
+        return (x, y, z)
 
     def print_values(self):
         print('X   Y   Z')
@@ -32,7 +56,8 @@ class DemoSensor(object):
 
 
 class Accelerometer(DemoSensor):
-    def __init__(self, bus):
+    def __init__(self, bus, **kwargs):
+        super(Accelerometer, self).__init__(**kwargs)
         self.bus = smbus.SMBus(bus)
         self.calibrate()
 
@@ -48,15 +73,5 @@ class Accelerometer(DemoSensor):
         self.bus.write_byte_data(0x1D, 0x14, 0)
         self.bus.write_byte_data(0x1D, 0x15, 0)
 
-    def get_axis(self, axis):
-        value = self.bus.read_byte_data(0x1D, axis)
-        return quantize(value, 255, 100)
-
-    def get_rotation(self):
-        '''
-        Returns the rotation as a tuple in the form (x, y, z).
-        '''
-        x = self.get_axis(Axis.X)
-        y = self.get_axis(Axis.Y)
-        z = self.get_axis(Axis.Z)
-        return (x, y, z)
+    def get_axis_raw(self, axis):
+        return self.bus.read_byte_data(0x1D, axis)

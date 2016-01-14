@@ -20,6 +20,11 @@ def main(args=None):
                         help='Use auth protocol')
     parser.add_argument('--bus', metavar='BUS', type=int,
                         action='store', help='SMBus ID', default=1)
+    parser.add_argument('--offset', action='store', type=int, nargs=3,
+                        metavar=('X', 'Y', 'Z'), default=(0, 0, 0),
+                        help='Sensor offset')
+    parser.add_argument('--no-quantization', action='store_true',
+                        help='Disable Quantization')
     parser.add_argument('--demo', action='store_true', help='Use demo sensor')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--client', action='store_true', help='Run as client',
@@ -35,7 +40,8 @@ def main(args=None):
                                'No (SMBus ID %d)' % p_args.bus))
 
     sensor_class = sensor.DemoSensor if p_args.demo else sensor.Accelerometer
-    sensor_obj = sensor_class(p_args.bus)
+    sensor_obj = sensor_class(p_args.bus, offset=p_args.offset,
+                              quantize=not p_args.no_quantization)
 
     if p_args.test_sensor:
         sensor_obj.print_values()
