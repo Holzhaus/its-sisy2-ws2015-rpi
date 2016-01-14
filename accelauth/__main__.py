@@ -1,10 +1,9 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import argparse
 import logging
-from lib import sensor
-from lib import server
-from lib import client
+from . import sensor
+from . import server
+from . import client
 
 
 def main(args=None):
