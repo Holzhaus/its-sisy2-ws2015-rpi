@@ -30,6 +30,7 @@ def main(args=None):
     print('Mode: %s' % ('Server' if p_args.server else 'Client'))
     print('Host: %s' % p_args.host)
     print('Port: %d' % p_args.port)
+    print('Auth: %s' % ('Yes' if p_args.auth else 'No'))
 
     if p_args.server:
         sensor_instance = sensor.Sensor()
