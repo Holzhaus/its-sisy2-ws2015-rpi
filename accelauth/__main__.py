@@ -18,6 +18,9 @@ def main(args=None):
                         action='store', help='Server port', default=9876)
     parser.add_argument('--auth', action='store_true',
                         help='Use auth protocol')
+    parser.add_argument('--bus', metavar='BUS', type=int, nargs=1,
+                        action='store', help='SMBus ID', default=1)
+    parser.add_argument('--demo', action='store_true', help='Use demo sensor')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--client', action='store_true', help='Run as client',
                       default=True)
@@ -30,9 +33,11 @@ def main(args=None):
     print('Host: %s' % p_args.host)
     print('Port: %d' % p_args.port)
     print('Auth: %s' % ('Yes' if p_args.auth else 'No'))
+    print('Demo sensor: %s' % ('Yes' if p_args.auth else
+                               'No (SMBus ID %d)' % p_args.bus))
 
     if p_args.server:
-        sensor_instance = sensor.Sensor()
+        sensor_instance = sensor.get_sensor(p_args.bus, is_demo=p_args.demo)
         server_class = (server.AuthServer if p_args.auth
                         else server.SimpleServer)
         server_instance = server_class(sensor_instance,
@@ -40,7 +45,7 @@ def main(args=None):
         server_instance.run()
     elif p_args.client:
         if p_args.auth:
-            sensor_instance = sensor.Sensor()
+            sensor_instance = sensor.get_sensor(p_args.bus, is_demo=p_args.demo)
             client_instance = client.AuthClient(
                 sensor_instance, p_args.host, p_args.port)
         else:
