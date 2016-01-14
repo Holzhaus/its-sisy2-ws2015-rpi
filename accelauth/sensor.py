@@ -53,8 +53,3 @@ class Accelerometer(DemoSensor):
         y = self.get_axis(Axis.Y)
         z = self.get_axis(Axis.Z)
         return (x, y, z)
-
-
-def get_sensor(bus, is_demo=False):
-    sensor_class = DemoSensor if is_demo else Accelerometer
-    return sensor_class(bus)

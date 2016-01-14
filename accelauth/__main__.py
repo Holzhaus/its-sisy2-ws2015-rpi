@@ -25,32 +25,40 @@ def main(args=None):
     mode.add_argument('--client', action='store_true', help='Run as client',
                       default=True)
     mode.add_argument('--server', action='store_true', help='Run as server')
+    mode.add_argument('--test-sensor', action='store_true',
+                      help='Test the sensor by printing the values')
     p_args = parser.parse_args(args)
 
     logging.basicConfig(level=logging.DEBUG if p_args.debug else logging.INFO)
+
+    print('Demo sensor: %s' % ('Yes' if p_args.auth else
+                               'No (SMBus ID %d)' % p_args.bus))
+
+    sensor_class = sensor.DemoSensor if p_args.demo else sensor.Accelerometer
+    sensor_obj = sensor_class(p_args.bus)
+
+    if p_args.test_sensor:
+        sensor_obj.print_values()
+        return
 
     print('Mode: %s' % ('Server' if p_args.server else 'Client'))
     print('Host: %s' % p_args.host)
     print('Port: %d' % p_args.port)
     print('Auth: %s' % ('Yes' if p_args.auth else 'No'))
-    print('Demo sensor: %s' % ('Yes' if p_args.auth else
-                               'No (SMBus ID %d)' % p_args.bus))
 
     if p_args.server:
-        sensor_instance = sensor.get_sensor(p_args.bus, is_demo=p_args.demo)
-        server_class = (server.AuthServer if p_args.auth
-                        else server.SimpleServer)
-        server_instance = server_class(sensor_instance,
-                                       p_args.host, p_args.port)
-        server_instance.run()
+        classobj = (server.AuthServer if p_args.auth else server.SimpleServer)
+        args = (sensor_obj, p_args.host, p_args.port)
     elif p_args.client:
         if p_args.auth:
-            sensor_instance = sensor.get_sensor(p_args.bus, is_demo=p_args.demo)
-            client_instance = client.AuthClient(
-                sensor_instance, p_args.host, p_args.port)
+            classobj = client.AuthClient
+            args = (sensor_obj, p_args.host, p_args.port)
         else:
-            client_instance = client.Client(p_args.host, p_args.port)
-        client_instance.run()
+            classobj = client.Client
+            args = (p_args.host, p_args.port)
+
+    obj = classobj(*args)
+    obj.run()
 
 
 if __name__ == '__main__':
