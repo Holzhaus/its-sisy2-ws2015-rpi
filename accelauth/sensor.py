@@ -4,6 +4,12 @@ import smbus
 import time
 
 
+def quantize(value, old_max, new_max, ndigits=0):
+    new_value = float(value)/float(old_max)*float(new_max)
+    rounded = round(new_value, ndigits)
+    return int(rounded) if ndigits == 0 else rounded
+
+
 class Axis(object):
     X = 0x06
     Y = 0x07
@@ -43,7 +49,8 @@ class Accelerometer(DemoSensor):
         self.bus.write_byte_data(0x1D, 0x15, 0)
 
     def get_axis(self, axis):
-        return self.bus.read_byte_data(0x1D, axis)
+        value = self.bus.read_byte_data(0x1D, axis)
+        return quantize(value, 255, 100)
 
     def get_rotation(self):
         '''
