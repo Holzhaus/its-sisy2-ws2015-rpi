@@ -12,13 +12,13 @@ def main(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--debug', action='store_true',
                         help='Show debug messages')
-    parser.add_argument('--host', metavar='HOST', nargs=1,
+    parser.add_argument('--host', metavar='HOST', type=str,
                         action='store', help='Server IP', default='localhost')
-    parser.add_argument('--port', metavar='PORT', type=int, nargs=1,
+    parser.add_argument('--port', metavar='PORT', type=int,
                         action='store', help='Server port', default=9876)
     parser.add_argument('--auth', action='store_true',
                         help='Use auth protocol')
-    parser.add_argument('--bus', metavar='BUS', type=int, nargs=1,
+    parser.add_argument('--bus', metavar='BUS', type=int,
                         action='store', help='SMBus ID', default=1)
     parser.add_argument('--demo', action='store_true', help='Use demo sensor')
     mode = parser.add_mutually_exclusive_group(required=True)
