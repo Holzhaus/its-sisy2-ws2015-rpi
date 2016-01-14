@@ -3,6 +3,7 @@
 import sys
 import time
 import logging
+from operator import sub
 from . import protocol
 
 if sys.version_info.major == 3:
@@ -14,10 +15,11 @@ else:
 
 
 class Client(object):
-    def __init__(self, host, port):
+    def __init__(self, sensor_instance, host, port):
         self._logger = logging.getLogger(__name__)
         self._server_url = 'http://%s:%d' % (host, port)
         self._server = ServerProxy(self._server_url)
+        self._sensor = sensor_instance
 
     def run(self):
         self._logger.info('Connecting to URL %s ...',
@@ -25,8 +27,8 @@ class Client(object):
         stopped = False
         while not stopped:
             try:
-                print(self._server.get_rotation())
-                time.sleep(1)
+                server_rotation = tuple(self._server.get_rotation())
+                client_rotation = tuple(self._sensor.get_rotation())
             except KeyboardInterrupt:
                 self._logger.info("Got a keyboard interrupt!")
                 stopped = True
@@ -34,14 +36,18 @@ class Client(object):
                 self._logger.warning("Error occured during execution!",
                                      exc_info=True)
                 stopped = True
+            else:
+                offset = tuple(map(sub, server_rotation, client_rotation))
+                print('          X   Y   Z')
+                print('Server: %3d %3d %3d' % server_rotation)
+                print('Client: %3d %3d %3d' % client_rotation)
+                print('Offset: %3d %3d %3d' % offset)
+                print('')
+                time.sleep(1)
         self._logger.info("Client exited.")
 
 
 class AuthClient(Client):
-    def __init__(self, sensor_instance, *args, **kwargs):
-        Client.__init__(self, *args, **kwargs)
-        self._sensor = sensor_instance
-
     def run(self):
         self._logger.info('Connecting to URL %s ...',
                           self._server_url)

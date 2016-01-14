@@ -50,12 +50,8 @@ def main(args=None):
         classobj = (server.AuthServer if p_args.auth else server.SimpleServer)
         args = (sensor_obj, p_args.host, p_args.port)
     elif p_args.client:
-        if p_args.auth:
-            classobj = client.AuthClient
-            args = (sensor_obj, p_args.host, p_args.port)
-        else:
-            classobj = client.Client
-            args = (p_args.host, p_args.port)
+        classobj = client.AuthClient if p_args.auth else client.Client
+        args = (sensor_obj, p_args.host, p_args.port)
 
     obj = classobj(*args)
     obj.run()
