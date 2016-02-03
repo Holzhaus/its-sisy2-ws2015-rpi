@@ -79,18 +79,16 @@ class AuthClient(Client):
         self._logger.debug('client_salt: %r', client_salt)
         self._logger.debug('client_hash: %r', client_hash)
 
-        (nonce, server_hash) = self._server.exchange_hashes(client_hash)
+        server_hash = self._server.exchange_hashes(client_hash)
 
-        self._logger.debug('nonce: %r', nonce)
         self._logger.debug('server_hash: %r', server_hash)
 
-        (code, message) = self._server.compare_values(nonce, client_salt)
+        (code, message) = self._server.compare_values(client_salt)
         if code != 0:
             self._logger.error('Authentication failed: %s', message)
         else:
             server_salt = message
-            server_hash2 = protocol.hash_rotation(client_rotation, server_salt,
-                                                  nonce=nonce)
+            server_hash2 = protocol.hash_rotation(client_rotation, server_salt)
             self._logger.debug('server_salt: %r', server_salt)
             self._logger.debug('server_hash2: %r', server_hash2)
             if server_hash2 == server_hash:

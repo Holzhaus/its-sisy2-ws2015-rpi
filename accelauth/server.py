@@ -90,42 +90,39 @@ class SimpleServer(Server):
 class AuthServer(Server):
     def __init__(self, *args, **kwargs):
         Server.__init__(self, *args, **kwargs)
-        self._authdata = {}
-        self._authenticated = None
-        self._nonces = protocol.nonce_generator()
+
+        self._userdata = {}
+        self._authenticated = {}
 
         self.register_function(self.exchange_hashes, 'exchange_hashes')
         self.register_function(self.compare_values, 'compare_values')
         self.register_function(self.communicate, 'communicate')
 
     def exchange_hashes(self, uid, client_hash):
-        nonce = next(self._nonces)
-        self._logger.debug('Exchanging hashes... (nonce %r)', nonce)
+        self._logger.debug('Exchanging hashes... (uid %r)', uid)
 
         # Get current rotation and hash it
         server_rotation = self._sensor.get_rotation()
         server_salt = protocol.get_salt()
-        server_hash = protocol.hash_rotation(server_rotation, server_salt,
-                                             nonce=nonce)
+        server_hash = protocol.hash_rotation(server_rotation, server_salt)
 
         self._logger.debug('server_rotation: %r', server_rotation)
         self._logger.debug('server_salt: %r', server_salt)
         self._logger.debug('server_hash: %r', server_hash)
 
         # Save server salt and hashed client rotation
-        self._authdata[nonce] = (server_rotation, server_salt, client_hash)
+        self._userdata[uid] = (server_rotation, server_salt, client_hash)
 
         # return our hash
-        return (nonce, server_hash)
+        return server_hash
 
-    def compare_values(self, uid, nonce, client_salt):
-        self._logger.debug('Comparing values... (nonce %r)', nonce)
+    def compare_values(self, uid, client_salt):
+        self._logger.debug('Comparing values... (uid %r)', uid)
         try:
-            data = self._authdata[nonce]
-            del self._authdata[nonce]
+            data = self._userdata.pop(uid)
         except KeyError:
-            self._logger.warning('Got invalid nonce: %r', nonce)
-            return (1, 'nonce invalid')
+            self._logger.warning('Got invalid uid: %r', uid)
+            return (1, 'uid invalid')
         (server_rotation, server_salt, client_hash) = data
 
         self._logger.debug('server_rotation: %r', server_rotation)
@@ -140,7 +137,7 @@ class AuthServer(Server):
             return (1, 'server hash mismatch')
         else:
             self._logger.warning('Client authenticated! (%r)', server_rotation)
-            self._authenticated = server_rotation
+            self._authenticated[uid] = server_rotation
             return (0, server_salt)
 
     def communicate(self, uid, client_iv, client_ciphertext):
@@ -153,8 +150,7 @@ class AuthServer(Server):
         if self._authenticated is None:
             self._logger.warning('Unauthorized connection attempt!')
             return ('', 'not authenticated')
-        server_rotation = self._authenticated
-        self._authenticated = None
+        server_rotation = self._authenticated.pop(uid)
 
         self._logger.info("Authenticated client has sent a message")
 
