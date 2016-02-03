@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import smbus
 import time
+try:
+    import smbus
+except ImportError:
+    print("You are missing the 'smbus' package. It's available at:\n" +
+          "  https://github.com/groeck/i2c-tools/tree/master/py-smbus\n" +
+          "Please install it or use the --demo command line switch.")
 
 
 def quantize(value, old_max, new_max, ndigits=0):
