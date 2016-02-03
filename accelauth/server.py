@@ -3,6 +3,7 @@
 import sys
 import logging
 from . import protocol
+import xml.etree.ElementTree as etree
 
 if sys.version_info.major == 3:
     from xmlrpc.server import SimpleXMLRPCServer
@@ -14,9 +15,35 @@ else:
     from xmlrpclib import Binary
 
 
-# Restrict to a particular path.
-class RequestHandler(SimpleXMLRPCRequestHandler):
+class UidRequestHandler(SimpleXMLRPCRequestHandler):
     rpc_paths = ('/RPC2',)
+
+    def __init__(self, req, addr, server):
+        self.logger = logging.getLogger('IpRequestHandler')
+        self.uid = addr[0]  # Client's IP address
+        SimpleXMLRPCRequestHandler.__init__(self, req, addr, server)
+
+    def decode_request_content(self, content):
+        """
+        We're overwriting this method in order to insert a client Identifier
+        (IP address) as first parameter of the method call. That way we know
+        which client we're dealing with in the actual server methods.
+        """
+        xml = SimpleXMLRPCRequestHandler.decode_request_content(self, content)
+        root = etree.fromstring(xml)
+        if root.tag != 'methodCall':
+            return xml
+
+        # Insert new param containing client_id as first parameter
+        el_params = root.find('params')
+        el_param = etree.Element('param')
+        el_value = etree.SubElement(el_param, 'value')
+        el_type = etree.SubElement(el_value, 'string')
+        el_type.text = self.uid
+        el_params.insert(0, el_param)
+
+        xml = etree.tostring(root, encoding="utf-8", method="xml")
+        return xml
 
 
 class Server(SimpleXMLRPCServer):
@@ -28,10 +55,8 @@ class Server(SimpleXMLRPCServer):
         SimpleXMLRPCServer.__init__(
             self,
             (self._server_address, self._server_port),
-            requestHandler=RequestHandler,
+            requestHandler=UidRequestHandler,
             logRequests=False)
-
-        self.register_introspection_functions()
 
         self._sensor = sensor_instance
 
@@ -40,7 +65,10 @@ class SimpleServer(Server):
     def __init__(self, *args, **kwargs):
         Server.__init__(self, *args, **kwargs)
 
-        self.register_function(self._sensor.get_rotation, 'get_rotation')
+        self.register_function(self.get_rotation, 'get_rotation')
+
+    def get_rotation(self, uid):
+        return self._sensor.get_rotation()
 
     def run(self):
         self._logger.info('Started listening on %s:%d ...',
@@ -70,7 +98,7 @@ class AuthServer(Server):
         self.register_function(self.compare_values, 'compare_values')
         self.register_function(self.communicate, 'communicate')
 
-    def exchange_hashes(self, client_hash):
+    def exchange_hashes(self, uid, client_hash):
         nonce = next(self._nonces)
         self._logger.debug('Exchanging hashes... (nonce %r)', nonce)
 
@@ -90,7 +118,7 @@ class AuthServer(Server):
         # return our hash
         return (nonce, server_hash)
 
-    def compare_values(self, nonce, client_salt):
+    def compare_values(self, uid, nonce, client_salt):
         self._logger.debug('Comparing values... (nonce %r)', nonce)
         try:
             data = self._authdata[nonce]
@@ -115,7 +143,7 @@ class AuthServer(Server):
             self._authenticated = server_rotation
             return (0, server_salt)
 
-    def communicate(self, client_iv, client_ciphertext):
+    def communicate(self, uid, client_iv, client_ciphertext):
         client_iv = client_iv.data
         client_ciphertext = client_ciphertext.data
 
