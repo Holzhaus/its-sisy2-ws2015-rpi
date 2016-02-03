@@ -92,84 +92,14 @@ class AuthServer(Server):
         Server.__init__(self, *args, **kwargs)
 
         self._userdata = {}
-        self._authenticated = {}
+        self._userkeys = {}
 
-        self.register_function(self.exchange_hashes, 'exchange_hashes')
-        self.register_function(self.compare_values, 'compare_values')
-        self.register_function(self.communicate, 'communicate')
-
-    def exchange_hashes(self, uid, client_hash):
-        self._logger.debug('Exchanging hashes... (uid %r)', uid)
-
-        # Get current rotation and hash it
-        server_rotation = self._sensor.get_rotation()
-        server_salt = protocol.get_salt()
-        server_hash = protocol.hash_rotation(server_rotation, server_salt)
-
-        self._logger.debug('server_rotation: %r', server_rotation)
-        self._logger.debug('server_salt: %r', server_salt)
-        self._logger.debug('server_hash: %r', server_hash)
-
-        # Save server salt and hashed client rotation
-        self._userdata[uid] = (server_rotation, server_salt, client_hash)
-
-        # return our hash
-        return server_hash
-
-    def compare_values(self, uid, client_salt):
-        self._logger.debug('Comparing values... (uid %r)', uid)
-        try:
-            data = self._userdata.pop(uid)
-        except KeyError:
-            self._logger.warning('Got invalid uid: %r', uid)
-            return (1, 'uid invalid')
-        (server_rotation, server_salt, client_hash) = data
-
-        self._logger.debug('server_rotation: %r', server_rotation)
-        self._logger.debug('server_salt: %r', server_salt)
-        self._logger.debug('client_hash: %r', client_hash)
-
-        client_hash2 = protocol.hash_rotation(server_rotation, client_salt)
-        self._logger.debug('client_hash2: %r', client_hash2)
-
-        if client_hash != client_hash2:
-            self._logger.warning('Server hash mismatch')
-            return (1, 'server hash mismatch')
-        else:
-            self._logger.warning('Client authenticated! (%r)', server_rotation)
-            self._authenticated[uid] = server_rotation
-            return (0, server_salt)
-
-    def communicate(self, uid, client_iv, client_ciphertext):
-        client_iv = client_iv.data
-        client_ciphertext = client_ciphertext.data
-
-        self._logger.debug('client_message (encrypted): %r', client_ciphertext)
-        self._logger.debug('client_iv: %r', client_iv)
-
-        if self._authenticated is None:
-            self._logger.warning('Unauthorized connection attempt!')
-            return ('', 'not authenticated')
-        server_rotation = self._authenticated.pop(uid)
-
-        self._logger.info("Authenticated client has sent a message")
-
-        client_plaintext = protocol.decrypt(
-            server_rotation, client_ciphertext, client_iv)
-
-        self._logger.info("client_message (plain): %s", client_plaintext)
-
-        server_plaintext = 'This is the server\'s answer!'
-
-        self._logger.info("server_message (plain): %s", server_plaintext)
-
-        server_ciphertext, server_iv = protocol.encrypt(
-            server_rotation, server_plaintext)
-
-        self._logger.debug('server_iv: %r', server_iv)
-        self._logger.debug('server_message (encrypted): %r', server_ciphertext)
-
-        return (Binary(server_ciphertext), Binary(server_iv))
+        self.register_function(
+            self.start_challenge_response, 'start_challenge_response')
+        self.register_function(
+            self.finish_challenge_response, 'finish_challenge_response')
+        self.register_function(
+            self.send_message, 'send_message')
 
     def run(self):
         self._logger.info('Started listening on %s:%d ...',
@@ -186,3 +116,66 @@ class AuthServer(Server):
                                      exc_info=True)
                 stopped = True
         self._logger.info("Server exited.")
+
+    def start_challenge_response(self, uid, cc):
+        cc = cc.data
+        secret = self._sensor.get_rotation()
+
+        sc = protocol.get_random_bytes()
+        while sc == cc:  # Make sure we don't use the same challenge
+            sc = protocol.get_random_bytes()
+
+        self._logger.debug('Generated sc = %r', sc)
+
+        sr = protocol.generate_response(sc, cc, secret)
+
+        self._logger.debug('Generated sr')
+
+        self._userdata[uid] = (cc, sc, secret)
+
+        return (Binary(sc), sr)
+
+    def finish_challenge_response(self, uid, cr):
+        try:
+            data = self._userdata.pop(uid)
+        except KeyError:
+            self._logger.warning('Invalid connection attempt from %r', uid)
+        else:
+            (cc, sc, secret) = data
+
+            # Check if client response is valid
+            cr_expected = protocol.generate_response(cc, sc, secret)
+
+            if cr == cr_expected:
+                # Client response is valid, let's generate the key
+                key = protocol.generate_key(secret, cc, sc)
+                self._userkeys[uid] = key
+                self._logger.debug('cr == cr_expected, we have a key!')
+            else:
+                self._logger.debug('cr != cr_expected, no key generated')
+        return "ok"
+
+    def send_message(self, uid, c_iv, c_ciphertext):
+        try:
+            key = self._userkeys[uid]
+        except KeyError:
+            self._logger.warning('No key for decrypting message from %r', uid)
+            return
+        c_iv, c_ciphertext = (
+            x.data if isinstance(x, Binary) else x
+            for x in (c_iv, c_ciphertext))
+
+        c_message = protocol.decrypt(key, c_iv, c_ciphertext)
+
+        print("Received message: %r" % c_message)
+
+        if c_message.lower() == 'logout':
+            try:
+                del self._userkeys[uid]
+            except KeyError:
+                pass
+            s_message = 'Goodbye!'
+        else:
+            s_message = 'I received your message, thanks!'
+        s_iv, s_ciphertext = protocol.encrypt(key, s_message)
+        return (Binary(s_iv), Binary(s_ciphertext))

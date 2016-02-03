@@ -9,6 +9,7 @@ from . import protocol
 if sys.version_info.major == 3:
     from xmlrpc.client import ServerProxy
     from xmlrpc.client import Binary
+    raw_input = input
 else:
     from xmlrpclib import ServerProxy
     from xmlrpclib import Binary
@@ -55,9 +56,9 @@ class AuthClient(Client):
         while not stopped:
             try:
                 rotation = self._sensor.get_rotation()
-                if(self.authenticate(rotation)):
-                    message = 'This is a secret message from the client.'
-                    self.exchange_secret_messages(rotation, message)
+                key = self.key_agreement(rotation)
+                if key is not None:
+                    self.exchange_messages(key)
                     stopped = True
                 else:
                     time.sleep(1)
@@ -70,60 +71,57 @@ class AuthClient(Client):
                 stopped = True
         self._logger.info("Client exited.")
 
-    def authenticate(self, client_rotation):
+    def key_agreement(self, secret):
+
         self._logger.debug('Trying to authenticate...')
-        client_salt = protocol.get_salt()
-        client_hash = protocol.hash_rotation(client_rotation, client_salt)
 
-        self._logger.debug('client_rotation: %r', client_rotation)
-        self._logger.debug('client_salt: %r', client_salt)
-        self._logger.debug('client_hash: %r', client_hash)
+        # Generate challenge cc and send to server
+        cc = protocol.get_random_bytes()
+        self._logger.debug('Generated sc = %r', cc)
 
-        server_hash = self._server.exchange_hashes(client_hash)
+        sc, sr = (self._server.start_challenge_response(Binary(cc)))
+        sc = sc.data
 
-        self._logger.debug('server_hash: %r', server_hash)
+        print(sc)
 
-        (code, message) = self._server.compare_values(client_salt)
-        if code != 0:
-            self._logger.error('Authentication failed: %s', message)
-        else:
-            server_salt = message
-            server_hash2 = protocol.hash_rotation(client_rotation, server_salt)
-            self._logger.debug('server_salt: %r', server_salt)
-            self._logger.debug('server_hash2: %r', server_hash2)
-            if server_hash2 == server_hash:
-                self._logger.info('Authentication succeeded! (%r)',
-                                  client_rotation)
-                return True
-            else:
-                self._logger.error('Authentication failed: %s',
-                                   'client hash mismatch')
-        return False
-
-    def exchange_secret_messages(self, client_rotation, client_plaintext):
-        self._logger.debug('Exchanging secret messages...')
-        self._logger.info('client_message (plain): %r', client_plaintext)
-
-        client_ciphertext, client_iv = protocol.encrypt(
-            client_rotation, client_plaintext)
-
-        self._logger.debug('client_message (encrypted): %r', client_ciphertext)
-        self._logger.debug('client_iv: %r', client_iv)
-
-        server_answer = self._server.communicate(
-            Binary(client_iv), Binary(client_ciphertext))
-
-        if tuple(server_answer) == ('', 'not authenticated'):
-            self._logger.critical('Server says were not authenticated!')
+        if cc == sc:
+            self._logger.debug('cc == sc, aborting')
             return
 
-        server_ciphertext = server_answer[0].data
-        server_iv = server_answer[1].data
+        # Check if server response is valid
+        sr_expected = protocol.generate_response(sc, cc, secret)
 
-        self._logger.debug('server_iv: %r', server_iv)
-        self._logger.debug('server_message (encrypted): %r', server_ciphertext)
+        if sr == sr_expected:
+            self._logger.debug('sr == sr_expected')
+            # Server response is valid, we'll send him the client response
+            cr = protocol.generate_response(cc, sc, secret)
+        else:
+            self._logger.debug('sr != sr_expected = %r', sr)
+            # Server response is invalid, we'll send bogus to the server
+            cr = protocol.generate_response(protocol.get_random_bytes())
 
-        server_plaintext = protocol.decrypt(
-            client_rotation, server_ciphertext, server_iv)
+        self._server.finish_challenge_response(cr)
 
-        self._logger.info('server_message (plain): %r', server_plaintext)
+        if sr == sr_expected:
+            key = protocol.generate_key(secret, cc, sc)
+            return key
+        else:
+            return None
+
+    def exchange_messages(self, key):
+        print("Type 'logout' to end conversation.")
+        stopped = False
+        while not stopped:
+            plaintext = raw_input('YOU: ')
+            if plaintext.lower() == 'logout':
+                stopped = True
+
+            iv, ciphertext = protocol.encrypt(key, plaintext)
+
+            s_iv, s_ciphertext = (
+                x.data if isinstance(x, Binary) else x
+                for x in self._server.send_message(
+                    Binary(iv), Binary(ciphertext)))
+
+            s_message = protocol.decrypt(key, s_iv, s_ciphertext)
+            print('SERVER: %s' % s_message)
