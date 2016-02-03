@@ -36,7 +36,7 @@ def main(args=None):
 
     logging.basicConfig(level=logging.DEBUG if p_args.debug else logging.INFO)
 
-    print('Demo sensor: %s' % ('Yes' if p_args.auth else
+    print('Demo sensor: %s' % ('Yes' if p_args.demo else
                                'No (SMBus ID %d)' % p_args.bus))
 
     sensor_class = sensor.DemoSensor if p_args.demo else sensor.Accelerometer
