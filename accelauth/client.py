@@ -77,7 +77,7 @@ class AuthClient(Client):
 
         # Generate challenge cc and send to server
         cc = protocol.get_random_bytes()
-        self._logger.debug('Generated sc = %r', cc)
+        self._logger.debug('Generated cc = %r', cc)
 
         sc, sr = (self._server.start_challenge_response(Binary(cc)))
         sc = sc.data
