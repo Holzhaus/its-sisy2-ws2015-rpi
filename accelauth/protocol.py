@@ -53,6 +53,13 @@ from Crypto.Protocol import KDF
 from Crypto.Cipher import AES
 
 
+def get_bytes(value):
+    if isinstance(value, (str, bytes)):
+        return value
+    else:
+        return str(value).encode('utf8')
+
+
 def get_random_bytes(size=16):
     rndfile = Random.new()
     return rndfile.read(size)
@@ -61,13 +68,13 @@ def get_random_bytes(size=16):
 def generate_response(*args):
     m = hashlib.sha1()
     for x in args:
-        m.update(str(x).encode('utf-8'))
+        m.update(get_bytes(x))
     return m.hexdigest()
 
 
 def generate_key(secret, *args):
-    passphrase = str(secret).encode('utf8')
-    salt = b''.join([str(x).encode('utf8') for x in args])
+    passphrase = get_bytes(secret)
+    salt = b''.join([get_bytes(x) for x in args])
     return KDF.PBKDF2(passphrase, salt, dkLen=32)
 
 
