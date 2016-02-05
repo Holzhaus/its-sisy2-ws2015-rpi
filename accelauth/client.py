@@ -80,7 +80,7 @@ class AuthClient(Client):
         cc = protocol.get_random_bytes()
         self._logger.debug('cc = %r', cc)
 
-        self._logger.info('Sendig client challenge to server...')
+        self._logger.info('Sending client challenge to server...')
         sc, sr = (self._server.start_challenge_response(Binary(cc)))
         sc = sc.data
         self._logger.info('Received server challenge/response...')
