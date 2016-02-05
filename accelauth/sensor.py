@@ -31,7 +31,7 @@ DEMO_VALUES = {
 class DemoSensor(object):
     def __init__(self, *args, **kwargs):
         self.offset = kwargs['offset'] if 'offset' in kwargs else (0, 0, 0)
-        self.quantize = kwargs['offset'] if 'quantize' in kwargs else True
+        self.quantize = kwargs['quantize'] if 'quantize' in kwargs else True
 
     def get_axis_raw(self, axis):
         return DEMO_VALUES[axis]
