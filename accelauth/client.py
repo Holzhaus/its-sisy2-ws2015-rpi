@@ -98,11 +98,13 @@ class AuthClient(Client):
 
         if sr == sr_expected:
             # Server response is valid, we'll send him the client response
-            self._logger.info('Server response is valid!')
+            self._logger.info('Server response is valid for secret %r!',
+                              secret)
             cr = protocol.generate_response(cc, sc, secret)
         else:
             # Server response is invalid, we'll send bogus to the server
-            self._logger.warning('Server response is invalid!')
+            self._logger.warning('Server response is invalid for secret %r!',
+                                 secret)
             cr = protocol.generate_response(protocol.get_random_bytes())
         self._logger.debug('cr = %r', cr)
 

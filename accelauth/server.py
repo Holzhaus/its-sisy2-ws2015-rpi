@@ -157,14 +157,16 @@ class AuthServer(Server):
 
             if cr == cr_expected:
                 # Client response is valid, let's generate the key
-                self._logger.info('Client response is valid!')
+                self._logger.info('Client response is valid for secret %r!',
+                                  secret)
                 self._logger.info('Generating key...')
                 key = protocol.generate_key(secret, cc, sc)
                 self._userkeys[uid] = key
                 self._logger.info('Key generated!')
                 self._logger.debug('key = %r', key)
             else:
-                self._logger.warning('Client response is invalid!')
+                self._logger.warning(
+                    'Client response is invalid for secret %r!', secret)
         return "ok"
 
     def send_message(self, uid, c_iv, c_ciphertext):
