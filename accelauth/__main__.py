@@ -14,7 +14,7 @@ def main(args=None):
                         help="Be verbose")
     parser.add_argument('-H', '--host', metavar='HOST', type=str,
                         action='store', help='Server IP', default='localhost')
-    parser.add_argument('-S', '--port', metavar='PORT', type=int,
+    parser.add_argument('-P', '--port', metavar='PORT', type=int,
                         action='store', help='Server port', default=9876)
     parser.add_argument('-a', '--auth', action='store_true',
                         help='Use auth protocol')
