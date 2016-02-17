@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{listings}
-
+\usepackage[european]{circuitikz}
 \usepackage[underline=true]{pgf-umlsd}
 \usetikzlibrary{calc,positioning,arrows}
 
@@ -64,126 +64,287 @@ In diesem Projekt geht es um den Aufbau einer verschlüsselten und authentifizie
 \setlength{\parindent}{0pt}
 \setcounter{page}{1}
 \section{Einleitung}
-In diesem Projekt geht es um den Aufbau einer verschlüsselten Verbindung und die gegenseitige Authentifizierung zweier Kommunikationspartner anhand von lagebezogener Messwerte. Dies geschieht mit Hilfe von Raspberry Pis und Lagesensoren. Die Authentifizierung erfolgt mittels eines Challenge-Response-Protokolls.\\ %Eine weitere Einsatzmöglichkeit wäre 
+In diesem Projekt geht es um den Aufbau einer verschlüsselten Verbindung und die gegenseitige Authentifizierung zweier Kommunikationspartner anhand von lagebezogener Messwerte. Dies geschieht mit Hilfe von Raspberry Pis und Lagesensoren. Die gegenseitige Authentifizierung (\emph{mutual authentication}) sowie die Schlüsselvereinbarung (\emph{key agreement}) erfolgt mittels eines Protokolls auf Basis eines Challenge-Response-Mechanismus.
 
-\subsection{Glossar}
-\begin{description}
-	\item[Lagesensor] Ein Sensor, der lagebezogene Messwerte der X-, Y- und Z-Achse ausgibt.
-\end{description}
+Als gemeinsames Geheimnis dienen hierbei die Messwerte des Lagesensors (Tupel der Form $(x, y, z)$, die die Lage im 3-dimensionalen Raum beschreiben).
 
 \newpage
 \section{Aufbau}
 In diesem Projekt werden zwei (2) Raspberry Pis mit je einem Lagesensor verwendet. Diese werden via Ethernet bedient und bauen auch eine gemeinsame Verbindung darüber auf.\\
 
-\subsection{Befehle}
-Das Programm kann mit folgenden Befehlen bedient werden:\\
+\subsection{Anschluss der Lagesensoren}
 
-\begin{tabular}{|l|c|p{8cm}|}
-	\hline
-	Befehl & Abkürzung & Funktion\\
-	\hline
-	\texttt{-{}-auth} & \texttt{-a} & \texttt{Festlegen, ob das Protokoll zur Authentifizierung verwendet werden soll.}\\
-	\hline
-	\texttt{-{}-bus <id>} & \texttt{-b <id>} & \texttt{SMBus-ID setzen. default = 1}\\
-	\hline
-	\texttt{-{}-client} & \texttt{-c} & \texttt{Das Programm als Client ausführen.}\\
-	\hline
-	\texttt{-{}-demo} & \texttt{-x} & \texttt{Einen Demo Sensor anstatt eines physischen Sensors verwenden.}\\
-	\hline
-	\texttt{-{}-host <ip>} & \texttt{-H <ip>} & \texttt{IP-Adresse des Hosts setzen.}\\
-	\hline
-	\texttt{-{}-no-quantization} & \texttt{-n} & \texttt{Quantisierung deaktivieren.}\\
-	\hline
-	\texttt{-{}-offset <x y z>} & \texttt{-o <x y z>} & \texttt{Sensoroffsets setzen, um Ungenauigkeiten der Sensoren auszugleichen.}\\
-	\hline
-	\texttt{-{}-port <port>} & \texttt{-S <port>} & \texttt{Port des Servers setzen.}\\
-	\hline
-	\texttt{-{}-server} & \texttt{-s} & \texttt{Das Programm als Server ausführen.}\\
-	\hline
-	\texttt{-{}-test-sensor} & \texttt{-t} & \texttt{Test der Sensoren via Ausgabe der aktuellen Sensordaten.}\\
-	\hline
-	\texttt{-{}-verbose} & \texttt{-v} & \texttt{Zeigt Debug-Informationen an.}\\
-	\hline
-\end{tabular}\\
+Als Lagesensoren wurden \emph{SainSmart MMA7455 Accelerometer} verwendet. Diese wurden jeweils wie folgt an die GPIO-Pins der Raspberry Pis angeschlossen:
 
-\newpage
+\vspace{1cm}
 
-\subsection{Protokoll}
-Das Programm ist mit folgendem Challenge-Response-Protokoll ausgestattet:\\
+\begin{tikzpicture}[every path/.style={}]
+\def\Raspi(#1)#2{%
+  \begin{scope}[shift={(#1)},font=\fontsize{7}{7}\selectfont]
+    \draw (0,0) rectangle (4,4);
 
-\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
-	\node[] (c) {client};
-	\node[right of=c] (s) {server};
-	\node[below of=c, node distance=5cm](c_g){};
-	\node[below of=s, node distance=5cm](s_g){};
-	%
-	\draw (c) -- (c_g);
-	\draw (s) -- (s_g);
-	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate cc};
-	\draw[->] ($(c)!0.2!(c_g)$) -- node[above,scale=1,midway]{cc} ($(s)!0.2!(s_g)$);
-	\draw[] ($(s)!0.25!(s_g)$) node[above,scale=1,right]{generate sc};
-	\draw[] ($(s)!0.35!(s_g)$) node[above,scale=1,right]{sr = hash(sc + cc + secret)};
-	\draw[<-] ($(c)!0.4!(c_g)$) -- node[above,scale=1,midway]{sc,sr} ($(s)!0.4!(s_g)$);
-	\draw[] ($(c)!0.45!(c_g)$) node[above,scale=1,left]{check sr};
-	\draw[] ($(c)!0.55!(c_g)$) node[above,scale=1,left]{cr = hash(cc + sc + secret)};
-	\draw[->] ($(c)!0.6!(c_g)$) -- node[above,scale=1,midway]{cr} ($(s)!0.6!(s_g)$);
-	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{check cr};
-	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{generate k};
-	\draw[] ($(s)!0.85!(s_g)$) node[above,scale=1,right]{generate k};
-\end{tikzpicture}
+    \node at (2,2.5) {\includegraphics[width=1.8cm]{images/logo_rpi.png}};
 
-Anschließend wird ein Kommunikationskanal mit dem Schlüssel \textit{k} wie folgt aufgebaut:\\
+    \draw (0,3.8) node[right] {3V3}        -- +(-0.25,0) node[circ]  {} coordinate (#2 3V3);
+    \draw (0,3.5) node[right] {SDA0}       -- +(-0.25,0) node[circ]  {} coordinate (#2 SDA0);
+    \draw (0,3.2) node[right] {SCL0}       -- +(-0.25,0) node[circ]  {} coordinate (#2 SCL0);
+    \draw (0,2.9) node[right] {GPIO4}      -- +(-0.25,0) node[ocirc] {} coordinate (#2 GPIO4);
+    \draw (0,2.6) node[right] {GND}        -- +(-0.25,0) node[ocirc] {} coordinate (#2 GND1);
+    \draw (0,2.3) node[right] {GPIO17}     -- +(-0.25,0) node[ocirc] {} coordinate (#2 GPIO0);
+    \draw (0,2.0) node[right] {GPIO27}     -- +(-0.25,0) node[ocirc] {} coordinate (#2 GPIO2);
+    \draw (0,1.7) node[right] {GPIO22}     -- +(-0.25,0) node[ocirc] {} coordinate (#2 GPIO3);
+    \draw (0,1.4) node[right] {3V3}        -- +(-0.25,0) node[circ]  {} coordinate (#2 3V32);
+    \draw (0,1.1) node[right] {SPI\_MOSI}  -- +(-0.25,0) node[ocirc] {} coordinate (#2 SPIMOSI);
+    \draw (0,0.8) node[right] {SPI\_MISO}  -- +(-0.25,0) node[ocirc] {} coordinate (#2 SPIMISO);
+    \draw (0,0.5) node[right] {SPI\_SCLK}  -- +(-0.25,0) node[ocirc] {} coordinate (#2 SPISCLK);
+    \draw (0,0.2) node[right] {GND}        -- +(-0.25,0) node[ocirc] {} coordinate (#2 GND2);
+    
+    \draw (4,3.8) node[left] {5V0}         -- +(0.25,0) node[ocirc] {} coordinate (#2 5V0);
+    \draw (4,3.5) node[left] {5V0}         -- +(0.25,0) node[ocirc] {} coordinate (#2 5V02);
+    \draw (4,3.2) node[left] {GND}         -- +(0.25,0) node[circ]  {} coordinate (#2 GND3);
+    \draw (4,2.9) node[left] {TXD}         -- +(0.25,0) node[ocirc] {} coordinate (#2 TXD);
+    \draw (4,2.6) node[left] {RXD}         -- +(0.25,0) node[ocirc] {} coordinate (#2 RXD);
+    \draw (4,2.3) node[left] {PWM0}        -- +(0.25,0) node[ocirc] {} coordinate (#2 PWM0);
+    \draw (4,2.0) node[left] {GND}         -- +(0.25,0) node[ocirc] {} coordinate (#2 GND4);
+    \draw (4,1.7) node[left] {GPI23}       -- +(0.25,0) node[ocirc] {} coordinate (#2 GPIO23);
+    \draw (4,1.4) node[left] {GPI24}       -- +(0.25,0) node[ocirc] {} coordinate (#2 GPIO24);
+    \draw (4,1.1) node[left] {GND}         -- +(0.25,0) node[ocirc] {} coordinate (#2 GND5);
+    \draw (4,0.8) node[left] {GPIO25}      -- +(0.25,0) node[ocirc] {} coordinate (#2 GPIO25);
+    \draw (4,0.5) node[left] {SPI\_CS0}    -- +(0.25,0) node[ocirc] {} coordinate (#2 SPICS0);
+    \draw (4,0.2) node[left] {SPI\_SC1}    -- +(0.25,0) node[ocirc] {} coordinate (#2 SPISC1);
+  \end{scope}
+}
+\def\Sensor(#1)#2{%
+  \begin{scope}[shift={(#1)},font=\fontsize{7}{7}\selectfont]
+    \draw (0,0) rectangle (3,2);
+    
+    \node[align=center] at (1.5,1) {MMA7455\\Sensor};
 
-\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
-	\node[] (c) {client};
-	\node[right of=c] (s) {server};
-	\node[below of=c, node distance=5cm](c_g){};
-	\node[below of=s, node distance=5cm](s_g){};
-	%
-	\draw (c) -- (c_g);
-	\draw (s) -- (s_g);
-	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate iv1};
-	\draw[] ($(c)!0.25!(c_g)$) node[above,scale=1,left]{c1 = $AESenc_k(iv1,m1)$};
-	\draw[->] ($(c)!0.35!(c_g)$) -- node[above,scale=1,midway]{iv1,c1} ($(s)!0.35!(s_g)$);
-	\draw[] ($(s)!0.45!(s_g)$) node[above,scale=1,right]{m1 = $AESdec_k(iv1,c1)$};
-	\draw[] ($(s)!0.55!(s_g)$) node[above,scale=1,right]{generate iv2};
-	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{m2 = $AESenc_k(iv2,c2)$};
-	\draw[<-] ($(c)!0.75!(c_g)$) -- node[above,scale=1,midway]{iv2,c2} ($(s)!0.75!(s_g)$);
-	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{m2 = $AESdec_k(iv2,c2)$};
+    \draw (0,1.4) node[right] {CS}  -- +(-0.25,0) node[circ]  {} coordinate (#2 CS);
+    \draw (0,1.1) node[right] {SDO} -- +(-0.25,0) node[ocirc] {} coordinate (#2 SDO);
+    \draw (0,0.8) node[right] {SDA} -- +(-0.25,0) node[circ]  {} coordinate (#2 SDA);
+    \draw (0,0.5) node[right] {SCL} -- +(-0.25,0) node[circ]  {} coordinate (#2 SCL);
+    
+    \draw (3,1.4) node[left] {IN1} -- +(0.25,0) node[ocirc] {} coordinate (#2 IN1);
+    \draw (3,1.1) node[left] {IN2} -- +(0.25,0) node[ocirc] {} coordinate (#2 IN2);
+    \draw (3,0.8) node[left] {GND} -- +(0.25,0) node[circ]  {} coordinate (#2 GND);
+    \draw (3,0.5) node[left] {VCC} -- +(0.25,0) node[circ]  {} coordinate (#2 VCC);
+  \end{scope}
+}
+  \Sensor(0,4){s};
+  \Raspi(8,2){r};
+  
+   \draw (s VCC) -- +(1,0) |- (r 3V3);
+   \draw (s GND) -- +(0.5,0) -- +(0.5,1.5) -- +(9.5,1.5) |- (r GND3);
+   \draw (s SCL) -- +(0,-1) -- +(6,-1) |- (r SCL0);
+   \draw (s SDA) -| +(-0.5,-2) -- +(6.5,-2) |- (r SDA0);
+   \draw (s CS)  -| +(-1,-3) -- +(7,-3) |- (r 3V32);
 \end{tikzpicture}
 
 \subsection{Bibliotheken}
 Das Programm verwendet folgende Python-Libraries:
-\begin{itemize}
-	\item pycrypto
-	\item smbus
-\end{itemize}
 
 \begin{description}
-	\item[pycrypto] Bibliothek mit kryptographischen Primitiven, z.B. Hashfunktionen wie sha1 und sha256, Chiffren wie AES und DES oder key derivation functions wie PBKDF2.
+	\item[pycrypto] Bibliothek mit kryptographischen Primitiven, z.B. Hashfunktionen (z.B. SHA1 und SHA256), Chiffren (z.B. AES und DES) oder Key Derivation Functions (z.B. PBKDF2).
 	\item[smbus] Python-Anbindungen für Linux-SMBus-Zugriff durch i2c-dev.
 \end{description}
+
+\newpage
+
+\subsection{Protokoll}
+Das Programm ist mit folgendem, auf einem Challenge-Response-Mechanismus basierenden Protokoll ausgestattet:\\
+
+\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
+	\node[] (c) {\textbf{Client}};
+	\node[right of=c] (s) {\textbf{Server}};
+	\node[below of=c, node distance=5cm](c_g){};
+	\node[below of=s, node distance=5cm](s_g){};
+	%\draw (c) -- (c_g);
+	%\draw (s) -- (s_g);
+	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate challenge $c_c$};
+	\draw[->] ($(c)!0.2!(c_g)$) -- node[above,scale=1,midway]{cc} ($(s)!0.2!(s_g)$);
+	\draw[] ($(s)!0.25!(s_g)$) node[above,scale=1,right]{generate challenge $s_c$};
+	\draw[] ($(s)!0.35!(s_g)$) node[above,scale=1,right]{$s_r = hash(s_c + c_c + secret)$};
+	\draw[<-] ($(c)!0.4!(c_g)$) -- node[above,scale=1,midway]{$s_c$,$s_r$} ($(s)!0.4!(s_g)$);
+	\draw[] ($(c)!0.45!(c_g)$) node[above,scale=1,left]{check $s_r$};
+	\draw[] ($(c)!0.55!(c_g)$) node[above,scale=1,left]{$c_r = hash(c_c + s_c + secret)$};
+	\draw[->] ($(c)!0.6!(c_g)$) -- node[above,scale=1,midway]{$c_r$} ($(s)!0.6!(s_g)$);
+	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{check $c_r$};
+	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{generate $k$};
+	\draw[] ($(s)!0.85!(s_g)$) node[above,scale=1,right]{generate $k$};
+\end{tikzpicture}
+
+Nach diesem Schritt sind beide Teilnehmer jeweils 
+
+\begin{itemize}
+\item authentifiziert (\emph{mutual authentication})
+\item im Besitz eines gemeinsamen Schlüssels $k$ (\emph{key agreement})
+\end{itemize}
+
+Anschließend können beide Teilnehmer mithilfe des Schlüssels $k$ verschlüsselt kommunizieren:\\
+
+\hspace{1.4cm}\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
+	\node[] (c) {\textbf{Client}};
+	\node[right of=c] (s) {\textbf{Server}};
+	\node[below of=c, node distance=5cm](c_g){};
+	\node[below of=s, node distance=5cm](s_g){};
+	%\draw (c) -- (c_g);
+	%\draw (s) -- (s_g);
+	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate $iv_1$};
+	\draw[] ($(c)!0.25!(c_g)$) node[above,scale=1,left]{$c_1 = enc_k(iv_1,m_1)$};
+	\draw[->] ($(c)!0.35!(c_g)$) -- node[above,scale=1,midway]{$iv_1$,$c_1$} ($(s)!0.35!(s_g)$);
+	\draw[] ($(s)!0.45!(s_g)$) node[above,scale=1,right]{$m_1 = dec_k(iv_1,c_1)$};
+	\draw[] ($(s)!0.55!(s_g)$) node[above,scale=1,right]{generate$iv_2$};
+	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{$m_2 = enc_k(iv_2,c_2)$};
+	\draw[<-] ($(c)!0.75!(c_g)$) -- node[above,scale=1,midway]{$iv_2$,$c_2$} ($(s)!0.75!(s_g)$);
+	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{$m_2 = dec_k(iv_2,c_2)$};
+\end{tikzpicture}
+
+
 
 \newpage
 \section{Bedienung}
 \subsection{Vorbereitungen}
 \begin{enumerate}
-	\item Programm auf die SD-Cards flashen.
-	\item SD-Cards in die Raspberry Pis einsetzen.
-	\item Raspberry Pis mit Hilfe eines Switches in einem Netzwerk anschließen.
+	\item Programm (und Abhängigkeiten) auf den Raspberry Pis installieren
+	\item Raspberry Pis in ein Netzwerk einbinden (via Ethernet-Kabel oder USB-WLAN-Adapter)
+	\item Lagesensoren an die GPIO-Pins der Raspberry Pis anschließen
 \end{enumerate}
 
-\subsection{Ausführung}
-\subsubsection*{Server}
-\begin{lstlisting}
-$ python -m accelauth -s -a -H 0.0.0.0 -v
-###
-\end{lstlisting}
+\subsection{Befehle}
+Das Programm kann mit folgenden Befehlen bedient werden:\\
 
+\begin{tabular}{l|l|p{8cm}}
+	\textbf{Befehl} & \textbf{Abkürzung} & \textbf{Funktion}\\
+	\hline
+	\texttt{-{}-auth} & \texttt{-a} & \texttt{Festlegen, ob das Protokoll zur Authentifizierung verwendet werden soll.}\\
+	\texttt{-{}-bus <id>} & \texttt{-b <id>} & \texttt{SMBus-ID setzen. default = 1}\\
+	\texttt{-{}-client} & \texttt{-c} & \texttt{Das Programm als Client ausführen.}\\
+	\texttt{-{}-demo} & \texttt{-x} & \texttt{Einen Demo Sensor anstatt eines physischen Sensors verwenden.}\\
+	\texttt{-{}-host <ip>} & \texttt{-H <ip>} & \texttt{IP-Adresse des Hosts setzen.}\\
+	\texttt{-{}-no-quantization} & \texttt{-n} & \texttt{Quantisierung deaktivieren.}\\
+	\texttt{-{}-offset <x y z>} & \texttt{-o <x y z>} & \texttt{Sensoroffsets setzen, um Ungenauigkeiten der Sensoren auszugleichen.}\\
+	\texttt{-{}-port <port>} & \texttt{-P <port>} & \texttt{Port des Servers setzen.}\\
+	\texttt{-{}-server} & \texttt{-s} & \texttt{Das Programm als Server ausführen.}\\
+	\texttt{-{}-test-sensor} & \texttt{-t} & \texttt{Test der Sensoren via Ausgabe der aktuellen Sensordaten.}\\
+	\texttt{-{}-verbose} & \texttt{-v} & \texttt{Zeigt Debug-Informationen an.}\\
+	\hline
+\end{tabular}\\
+
+\subsection{Ausführung}
+
+Testweise führen wir das Programm aus, wobei der Server hier auf dem Raspberry Pi mit der IP-Adresse 192.168.178.11 lauscht. Der Client verbindet sich von IP-Adresse 192.168.178.22 aus und versucht, eine authentifizierte und verschlüsselte Verbindung aufzubauen.
+
+Zur Veranschaulichung schlägt hier der erste Authentifizierungsversuch aufgrund von unterschiedlichen Messdaten fehl, während der zweite Versuch gelingt.
+
+\newpage
 \subsubsection*{Client}
 \begin{lstlisting}
-$ python -m accelauth -c -a -H 0.0.0.0 -v
-###
+pi@192.168.178.22 ~ $ ./run.py -ac -H 192.168.178.11 -vvv
+Demo sensor: No (SMBus ID 1)
+Mode: Client
+Host: 192.168.178.11
+Port: 9876
+Auth: Yes
+INFO:accelauth.client:Connecting to URL http://192.168.178.11:9876 ...
+INFO:accelauth.client:Trying to authenticate...
+DEBUG:accelauth.client:secret = (39, 5, 10)
+INFO:accelauth.client:Generating client challenge...
+DEBUG:accelauth.client:cc = '\x19e\xc6%b&\x8b\x8eV\x11\x1c\xf6\xec\xc6\xd2\xf3'
+INFO:accelauth.client:Sending client challenge to server...
+INFO:accelauth.client:Received server challenge/response...
+DEBUG:accelauth.client:sc = '\x17\xd7o\xca\xa1\xeb\x95\x83\x08\xe7\xc5\x17\xaf#\xd0\x9a'
+INFO:accelauth.client:Checking if server response is valid...
+DEBUG:accelauth.client:sr1 = 'd50643e86f9a72da388f0a8566dbd460272d6014'
+DEBUG:accelauth.client:sr2 = 'ae7d7df4f7505fa4820643aa0c861900e0137281' (expected)
+WARNING:accelauth.client:Server response is invalid for secret (39, 5, 10)!
+DEBUG:accelauth.client:cr = 'a4871bbf1e4dda07efc2bd4b5b04f256f008e519'
+INFO:accelauth.client:Sending client response....
+INFO:accelauth.client:Trying to authenticate...
+DEBUG:accelauth.client:secret = (38, 35, 19)
+INFO:accelauth.client:Generating client challenge...
+DEBUG:accelauth.client:cc = "\xd4\x112\x95,7\xc0\xec\x02\x10@\x10#'\xdc\xbf"
+INFO:accelauth.client:Sending client challenge to server...
+INFO:accelauth.client:Received server challenge/response...
+DEBUG:accelauth.client:sc = '\x9d4\x82\x9aW\x7fdI\x98\x81\x7fS\x04G\xed4'
+INFO:accelauth.client:Checking if server response is valid...
+DEBUG:accelauth.client:sr1 = '646846269339b6f744f4e1dc7424f8efdd6c359e'
+DEBUG:accelauth.client:sr2 = '646846269339b6f744f4e1dc7424f8efdd6c359e' (expected)
+INFO:accelauth.client:Server response is valid for secret (38, 35, 19)!
+DEBUG:accelauth.client:cr = 'e492aa8dfbb59b5b9c9318f7ae4d479a26158e88'
+INFO:accelauth.client:Sending client response....
+INFO:accelauth.client:Generating key...
+INFO:accelauth.client:Key generated!
+DEBUG:accelauth.client:key = "Ls\xd52\xdc\xae\xa2\x90?'(\xf4z\xa1R\x9eY4\x04\x88\xb9\xbc/\x16\x89\x12\xfbH\x0f\x08\x9a\xed"
+Type 'logout' to end conversation.
+YOU: hello
+DEBUG:accelauth.client:iv = '\x85\xd1s5Y\xd9-\x82\xd2\xac\x1bNs\xfd\xbf\xfb'
+DEBUG:accelauth.client:ciphertext = '\xdcL\xbb,.\xa8\xf0\xcfv\xdc6(O\xa1bS'
+INFO:accelauth.client:Sending message to server...
+DEBUG:accelauth.client:s_iv = '\xfe\x0c\nSm$\xdb\x92\xf2\x19\x02/(\xbc\xff?'
+DEBUG:accelauth.client:s_ciphertext = '\xb2=\xf5a\x99\xf46\xdfB\xe4\xa5\xc2\xaei\xc7\xcaT\xdc_\xb1jM\xad\x05J\xc4%m.\\\t\xf6P\x1b7\x1c\x97)iz\x15\n\xf0\xcf}\xf3ku'
+SERVER: I received your message, thanks!
+YOU: logout
+DEBUG:accelauth.client:iv = '\x83\xed[Ot\x81\xd1\xbb\xb3\x0e\xbd$\xb9U\xfa\xab'
+DEBUG:accelauth.client:ciphertext = '\x0c\xef\xcc\x8e\xbb\x8c\x90\xbf\x83+X\xbeQ\xc5]J'
+INFO:accelauth.client:Sending message to server...
+DEBUG:accelauth.client:s_iv = 'n\x7f\xd0\xb6\x0b\xc5K\x8a\xfd\xe2\xea\x03J\x00\x8e\xc4'
+DEBUG:accelauth.client:s_ciphertext = "F\xc0\xa5r\xea\xbao\x18'k\x06\x03(\xca\x8e\x8b"
+SERVER: Goodbye!
+INFO:accelauth.client:Client exited.
+\end{lstlisting}
+
+\newpage
+\subsubsection*{Server}
+\begin{lstlisting}
+pi@192.168.178.11 ~ $ ./run.py -as -H 0.0.0.0 -vvv
+Demo sensor: No (SMBus ID 1)
+Mode: Server
+Host: 0.0.0.0
+Port: 9876
+Auth: Yes
+INFO:accelauth.server:Started listening on 0.0.0.0:9876 ...
+INFO:accelauth.server:New authentication request from '192.168.178.22'!
+DEBUG:accelauth.server:secret = (29, 40, 7)
+DEBUG:accelauth.server:cc = '\x19e\xc6%b&\x8b\x8eV\x11\x1c\xf6\xec\xc6\xd2\xf3'
+INFO:accelauth.server:Generating server challenge...
+DEBUG:accelauth.server:sc = '\x17\xd7o\xca\xa1\xeb\x95\x83\x08\xe7\xc5\x17\xaf#\xd0\x9a'
+INFO:accelauth.server:Generating server response...
+DEBUG:accelauth.server:sr = 'd50643e86f9a72da388f0a8566dbd460272d6014'
+INFO:accelauth.server:Sending server challenge/response to '192.168.178.22' and wait...
+INFO:accelauth.server:Continuing authentication with '192.168.178.22'!
+INFO:accelauth.server:Checking if client response is valid...
+DEBUG:accelauth.server:cr1 = 'a4871bbf1e4dda07efc2bd4b5b04f256f008e519'
+DEBUG:accelauth.server:cr2 = 'c5a734ea4d8a8c0d02e8f61964d0345308684cde' (expected)
+WARNING:accelauth.server:Client response is invalid for secret (29, 40, 7)!
+INFO:accelauth.server:New authentication request from '192.168.178.22'!
+DEBUG:accelauth.server:secret = (38, 35, 19)
+DEBUG:accelauth.server:cc = "\xd4\x112\x95,7\xc0\xec\x02\x10@\x10#'\xdc\xbf"
+INFO:accelauth.server:Generating server challenge...
+DEBUG:accelauth.server:sc = '\x9d4\x82\x9aW\x7fdI\x98\x81\x7fS\x04G\xed4'
+INFO:accelauth.server:Generating server response...
+DEBUG:accelauth.server:sr = '646846269339b6f744f4e1dc7424f8efdd6c359e'
+INFO:accelauth.server:Sending server challenge/response to '192.168.178.22' and wait...
+INFO:accelauth.server:Continuing authentication with '192.168.178.22'!
+INFO:accelauth.server:Checking if client response is valid...
+DEBUG:accelauth.server:cr1 = 'e492aa8dfbb59b5b9c9318f7ae4d479a26158e88'
+DEBUG:accelauth.server:cr2 = 'e492aa8dfbb59b5b9c9318f7ae4d479a26158e88' (expected)
+INFO:accelauth.server:Client response is valid for secret (38, 35, 19)!
+INFO:accelauth.server:Generating key...
+INFO:accelauth.server:Key generated!
+DEBUG:accelauth.server:key = "Ls\xd52\xdc\xae\xa2\x90?'(\xf4z\xa1R\x9eY4\x04\x88\xb9\xbc/\x16\x89\x12\xfbH\x0f\x08\x9a\xed"
+DEBUG:accelauth.server:c_iv = '\x85\xd1s5Y\xd9-\x82\xd2\xac\x1bNs\xfd\xbf\xfb'
+DEBUG:accelauth.server:c_ciphertext = '\xdcL\xbb,.\xa8\xf0\xcfv\xdc6(O\xa1bS'
+Received message: u'hello'
+DEBUG:accelauth.server:s_message = 'I received your message, thanks!'
+DEBUG:accelauth.server:s_iv = '\xfe\x0c\nSm$\xdb\x92\xf2\x19\x02/(\xbc\xff?'
+DEBUG:accelauth.server:s_ciphertext = '\xb2=\xf5a\x99\xf46\xdfB\xe4\xa5\xc2\xaei\xc7\xcaT\xdc_\xb1jM\xad\x05J\xc4%m.\\\t\xf6P\x1b7\x1c\x97)iz\x15\n\xf0\xcf}\xf3ku'
+DEBUG:accelauth.server:c_iv = '\x83\xed[Ot\x81\xd1\xbb\xb3\x0e\xbd$\xb9U\xfa\xab'
+DEBUG:accelauth.server:c_ciphertext = '\x0c\xef\xcc\x8e\xbb\x8c\x90\xbf\x83+X\xbeQ\xc5]J'
+Received message: u'logout'
+DEBUG:accelauth.server:s_message = 'Goodbye!'
+DEBUG:accelauth.server:s_iv = 'n\x7f\xd0\xb6\x0b\xc5K\x8a\xfd\xe2\xea\x03J\x00\x8e\xc4'
+DEBUG:accelauth.server:s_ciphertext = "F\xc0\xa5r\xea\xbao\x18'k\x06\x03(\xca\x8e\x8b"
 \end{lstlisting}
 
 \end{document}
