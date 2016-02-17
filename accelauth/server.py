@@ -48,7 +48,7 @@ class UidRequestHandler(SimpleXMLRPCRequestHandler):
 
 class Server(SimpleXMLRPCServer):
     def __init__(self, sensor_instance, server_address, server_port):
-        self._logger = logging.getLogger()
+        self._logger = logging.getLogger(__name__)
         self._server_address = server_address
         self._server_port = server_port
 
