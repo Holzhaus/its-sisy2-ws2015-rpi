@@ -1,0 +1,189 @@
+\documentclass{article}
+
+\usepackage[utf8x]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\usepackage[underline=true]{pgf-umlsd}
+\usetikzlibrary{calc,positioning,arrows}
+
+\lstset{
+	basicstyle=\scriptsize\ttfamily,
+	numbers=left,
+	frame=single,
+	breaklines=true,
+	breakautoindent=true,
+	postbreak={\mbox{$\hookrightarrow$}},
+	literate={ä}{{\"a}}1 {ö}{{\"o}}1 {ü}{{\"u}}1 {ß}{{\ss}}1 {Ä}{{\"A}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1}
+
+\hypersetup{
+    colorlinks=false,
+    pdfborder={0 0 0},
+}
+
+\renewcommand{\ttdefault}{pcr}
+\DeclareOldFontCommand{\tt}{\normalfont\ttfamily}{\mathtt}
+
+\title{
+\includegraphics[height=2cm]{images/logo_rub}\\\vspace{1cm}
+Einrichtung einer verschlüsselten und authentifizierten Verbindung auf der Basis lagebezogener Messdaten\\\vspace{7mm}
+Raspberry Pi-Projekt\\(WS 2015/2016)\\\vspace{1cm}
+\large{Lehrstuhl für Digitale Kommunikationssysteme\\
+Ruhr-Universität Bochum
+\\\vspace{0.75cm}}}
+
+\author{
+Jan Holthuis\\
+Matr.-Nr: 108 009 215 809\\
+{\tt \href{mailto:jan.holthuis@ruhr-uni-bochum.de}{jan.holthuis@ruhr-uni-bochum.de}}
+\and 
+Daniel Peeren\\
+Matr.-Nr: 108 012 210 266\\
+{\tt \href{mailto:daniel.peeren@ruhr-uni-bochum.de}{daniel.peeren@ruhr-uni-bochum.de}}
+\vspace{0.75cm}}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+In diesem Projekt geht es um den Aufbau einer verschlüsselten und authentifizierten Verbindung zweier Kommunikationspartner mittels lagebezogener Daten.
+\end{abstract}
+
+\newpage
+\thispagestyle{empty}
+\tableofcontents
+
+\newpage
+\setlength{\parindent}{0pt}
+\setcounter{page}{1}
+\section{Einleitung}
+In diesem Projekt geht es um den Aufbau einer verschlüsselten Verbindung und die gegenseitige Authentifizierung zweier Kommunikationspartner anhand von lagebezogener Messwerte. Dies geschieht mit Hilfe von Raspberry Pis und Lagesensoren. Die Authentifizierung erfolgt mittels eines Challenge-Response-Protokolls.\\ %Eine weitere Einsatzmöglichkeit wäre 
+
+\subsection{Glossar}
+\begin{description}
+	\item[Lagesensor] Ein Sensor, der lagebezogene Messwerte der X-, Y- und Z-Achse ausgibt.
+\end{description}
+
+\newpage
+\section{Aufbau}
+In diesem Projekt werden zwei (2) Raspberry Pis mit je einem Lagesensor verwendet. Diese werden via Ethernet bedient und bauen auch eine gemeinsame Verbindung darüber auf.\\
+
+\subsection{Befehle}
+Das Programm kann mit folgenden Befehlen bedient werden:\\
+
+\begin{tabular}{|l|c|p{8cm}|}
+	\hline
+	Befehl & Abkürzung & Funktion\\
+	\hline
+	\texttt{-{}-auth} & \texttt{-a} & \texttt{Festlegen, ob das Protokoll zur Authentifizierung verwendet werden soll.}\\
+	\hline
+	\texttt{-{}-bus <id>} & \texttt{-b <id>} & \texttt{SMBus-ID setzen. default = 1}\\
+	\hline
+	\texttt{-{}-client} & \texttt{-c} & \texttt{Das Programm als Client ausführen.}\\
+	\hline
+	\texttt{-{}-demo} & \texttt{-x} & \texttt{Einen Demo Sensor anstatt eines physischen Sensors verwenden.}\\
+	\hline
+	\texttt{-{}-host <ip>} & \texttt{-H <ip>} & \texttt{IP-Adresse des Hosts setzen.}\\
+	\hline
+	\texttt{-{}-no-quantization} & \texttt{-n} & \texttt{Quantisierung deaktivieren.}\\
+	\hline
+	\texttt{-{}-offset <x y z>} & \texttt{-o <x y z>} & \texttt{Sensoroffsets setzen, um Ungenauigkeiten der Sensoren auszugleichen.}\\
+	\hline
+	\texttt{-{}-port <port>} & \texttt{-S <port>} & \texttt{Port des Servers setzen.}\\
+	\hline
+	\texttt{-{}-server} & \texttt{-s} & \texttt{Das Programm als Server ausführen.}\\
+	\hline
+	\texttt{-{}-test-sensor} & \texttt{-t} & \texttt{Test der Sensoren via Ausgabe der aktuellen Sensordaten.}\\
+	\hline
+	\texttt{-{}-verbose} & \texttt{-v} & \texttt{Zeigt Debug-Informationen an.}\\
+	\hline
+\end{tabular}\\
+
+\newpage
+
+\subsection{Protokoll}
+Das Programm ist mit folgendem Challenge-Response-Protokoll ausgestattet:\\
+
+\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
+	\node[] (c) {client};
+	\node[right of=c] (s) {server};
+	\node[below of=c, node distance=5cm](c_g){};
+	\node[below of=s, node distance=5cm](s_g){};
+	%
+	\draw (c) -- (c_g);
+	\draw (s) -- (s_g);
+	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate cc};
+	\draw[->] ($(c)!0.2!(c_g)$) -- node[above,scale=1,midway]{cc} ($(s)!0.2!(s_g)$);
+	\draw[] ($(s)!0.25!(s_g)$) node[above,scale=1,right]{generate sc};
+	\draw[] ($(s)!0.35!(s_g)$) node[above,scale=1,right]{sr = hash(sc + cc + secret)};
+	\draw[<-] ($(c)!0.4!(c_g)$) -- node[above,scale=1,midway]{sc,sr} ($(s)!0.4!(s_g)$);
+	\draw[] ($(c)!0.45!(c_g)$) node[above,scale=1,left]{check sr};
+	\draw[] ($(c)!0.55!(c_g)$) node[above,scale=1,left]{cr = hash(cc + sc + secret)};
+	\draw[->] ($(c)!0.6!(c_g)$) -- node[above,scale=1,midway]{cr} ($(s)!0.6!(s_g)$);
+	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{check cr};
+	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{generate k};
+	\draw[] ($(s)!0.85!(s_g)$) node[above,scale=1,right]{generate k};
+\end{tikzpicture}
+
+Anschließend wird ein Kommunikationskanal mit dem Schlüssel \textit{k} wie folgt aufgebaut:\\
+
+\begin{tikzpicture}[node distance=4cm,auto,>=stealth']
+	\node[] (c) {client};
+	\node[right of=c] (s) {server};
+	\node[below of=c, node distance=5cm](c_g){};
+	\node[below of=s, node distance=5cm](s_g){};
+	%
+	\draw (c) -- (c_g);
+	\draw (s) -- (s_g);
+	\draw[] ($(c)!0.15!(c_g)$) node[above,scale=1,left]{generate iv1};
+	\draw[] ($(c)!0.25!(c_g)$) node[above,scale=1,left]{c1 = $AESenc_k(iv1,m1)$};
+	\draw[->] ($(c)!0.35!(c_g)$) -- node[above,scale=1,midway]{iv1,c1} ($(s)!0.35!(s_g)$);
+	\draw[] ($(s)!0.45!(s_g)$) node[above,scale=1,right]{m1 = $AESdec_k(iv1,c1)$};
+	\draw[] ($(s)!0.55!(s_g)$) node[above,scale=1,right]{generate iv2};
+	\draw[] ($(s)!0.65!(s_g)$) node[above,scale=1,right]{m2 = $AESenc_k(iv2,c2)$};
+	\draw[<-] ($(c)!0.75!(c_g)$) -- node[above,scale=1,midway]{iv2,c2} ($(s)!0.75!(s_g)$);
+	\draw[] ($(c)!0.85!(c_g)$) node[above,scale=1,left]{m2 = $AESdec_k(iv2,c2)$};
+\end{tikzpicture}
+
+\subsection{Bibliotheken}
+Das Programm verwendet folgende Python-Libraries:
+\begin{itemize}
+	\item pycrypto
+	\item smbus
+\end{itemize}
+
+\begin{description}
+	\item[pycrypto] Bibliothek mit kryptographischen Primitiven, z.B. Hashfunktionen wie sha1 und sha256, Chiffren wie AES und DES oder key derivation functions wie PBKDF2.
+	\item[smbus] Python-Anbindungen für Linux-SMBus-Zugriff durch i2c-dev.
+\end{description}
+
+\newpage
+\section{Bedienung}
+\subsection{Vorbereitungen}
+\begin{enumerate}
+	\item Programm auf die SD-Cards flashen.
+	\item SD-Cards in die Raspberry Pis einsetzen.
+	\item Raspberry Pis mit Hilfe eines Switches in einem Netzwerk anschließen.
+\end{enumerate}
+
+\subsection{Ausführung}
+\subsubsection*{Server}
+\begin{lstlisting}
+$ python -m accelauth -s -a -H 0.0.0.0 -v
+###
+\end{lstlisting}
+
+\subsubsection*{Client}
+\begin{lstlisting}
+$ python -m accelauth -c -a -H 0.0.0.0 -v
+###
+\end{lstlisting}
+
+\end{document}
